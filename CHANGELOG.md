@@ -8,7 +8,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+
 - `TokenChunker` for token-level chunking using tiktoken with a new `[tokens]` optional extra (closes #44)
+
+- Structured logging for ingest, query, and retriever stages, including timing and empty-ingest warnings (closes #41).
+- `RecursiveChunker.from_config()` for creating a chunker from pipeline configuration (closes #25).
+
+### Fixed
+- `TextFileLoader` and `MarkdownLoader` now convert Unicode decoding and unknown encoding errors to `LoaderError`, with configurable text decoding error handling (closes #24).
+- Validate chunker size and overlap parameters in `FixedSizeChunker` and `SentenceChunker` (closes #25).
 
 ## [0.3.0] - 2026-09-25
 
