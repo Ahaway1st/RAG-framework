@@ -6,7 +6,6 @@ import types
 
 import pytest
 
-import ragframework.document.loaders as loaders
 from ragframework.document.loaders import (
     DocxLoader,
     MarkdownLoader,
@@ -101,12 +100,19 @@ class TestDocxLoader:
 
         with pytest.raises(LoaderError, match="File not found"):
             loader.load("/nonexistent/path/file.docx")
-    
+
     def test_missing_dependency_raises(self, tmp_path, monkeypatch):
         docx_path = tmp_path / "doc.docx"
         docx_path.write_bytes(b"fake docx content")
 
-        monkeypatch.setattr(loaders, "DocxDocument", None)
+        original_import = builtins.__import__
+
+        def mock_import(name, *args, **kwargs):
+            if name == "docx":
+                raise ImportError("No module named 'docx'")
+            return original_import(name, *args, **kwargs)
+
+        monkeypatch.setattr(builtins, "__import__", mock_import)
 
         loader = DocxLoader()
 

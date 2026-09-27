@@ -13,11 +13,6 @@ from pathlib import Path
 from ragframework.base import Document, DocumentLoader
 from ragframework.exceptions import LoaderError
 
-try:
-    from docx import Document as DocxDocument
-except ImportError:
-    DocxDocument = None
-
 
 def _make_id(source: str) -> str:
     return hashlib.md5(source.encode()).hexdigest()[:12]
@@ -93,11 +88,13 @@ class DocxLoader(DocumentLoader):
         if not path.is_file():
             raise LoaderError(f"Not a file: {source}")
 
-        if DocxDocument is None:
+        try:
+            from docx import Document as DocxDocument
+        except ImportError as exc:
             raise LoaderError(
                 "DOCX support requires 'ragframework[docx]'. "
                 "Install it with: pip install ragframework[docx]"
-            )
+            ) from exc
 
         try:
             docx = DocxDocument(str(path))
