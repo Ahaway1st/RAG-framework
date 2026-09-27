@@ -7,6 +7,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+- Structured logging for ingest, query, and retriever stages, including timing and empty-ingest warnings (closes #41).
+- 
 ## Fixed
 - `TextFileLoader` and `MarkdownLoader` now convert Unicode decoding and unknown encoding errors to `LoaderError`, with configurable text decoding error handling (closes #24).
 
