@@ -12,6 +12,7 @@ from ragframework.document.chunkers import (
     RecursiveChunker,
     SentenceChunker,
 )
+from typing import Any
 
 
 def test_recursive_chunker_from_config():
@@ -303,13 +304,26 @@ class TestRecursiveChunker:
 
 
 class FakeEncoding:
-    """Trivially encodes each character as one token (its ordinal)."""
+    """Emulates tiktoken with byte-level tokens, special token checks, and decode_bytes."""
 
-    def encode(self, text: str) -> list[int]:
+    def encode(
+        self,
+        text: str,
+        *,
+        allowed_special: Any = (),
+        disallowed_special: Any = "all",
+    ) -> list[int]:
+        if disallowed_special and "<|endoftext|>" in text:
+            raise ValueError(
+                "Encountered text corresponding to disallowed special token '<|endoftext|>'."
+            )
         return list(text.encode("utf-8"))
 
-    def decode(self, tokens: list[int]) -> str:
-        return bytes(tokens).decode("utf-8")
+    def decode(self, tokens: list[int], errors: str = "replace") -> str:
+        return bytes(tokens).decode("utf-8", errors=errors)
+
+    def decode_bytes(self, tokens: list[int]) -> bytes:
+        return bytes(tokens)
 
 
 @pytest.fixture
@@ -398,3 +412,42 @@ class TestTokenChunker:
 
         with pytest.raises(ImportError, match=r"ragframework\[tokens\]"):
             TokenChunker()
+
+    def test_special_tokens_treated_as_ordinary_text(self, fake_tiktoken):
+        from ragframework.document.chunkers import TokenChunker
+
+        doc = Document(id="x", content="Hello <|endoftext|> world", metadata={})
+        chunker = TokenChunker(chunk_tokens=50, overlap_tokens=0)
+        chunks = chunker.chunk(doc)
+        assert len(chunks) == 1
+        assert chunks[0].content == "Hello <|endoftext|> world"
+
+    def test_emoji_preserves_complete_characters(self, fake_tiktoken):
+        from ragframework.document.chunkers import TokenChunker
+
+        doc = Document(id="x", content="A 🙂 B 🚀 C", metadata={})
+        chunker = TokenChunker(chunk_tokens=6, overlap_tokens=0)
+        chunks = chunker.chunk(doc)
+        assert len(chunks) > 1
+        for c in chunks:
+            assert "\ufffd" not in c.content
+        assert "".join(c.content for c in chunks) == "A 🙂 B 🚀 C"
+
+    def test_cjk_preserves_complete_characters(self, fake_tiktoken):
+        from ragframework.document.chunkers import TokenChunker
+
+        doc = Document(id="x", content="你好世界，这是一个测试", metadata={})
+        chunker = TokenChunker(chunk_tokens=9, overlap_tokens=0)
+        chunks = chunker.chunk(doc)
+        assert len(chunks) > 1
+        for c in chunks:
+            assert "\ufffd" not in c.content
+        assert "".join(c.content for c in chunks) == "你好世界，这是一个测试"
+
+    def test_character_cannot_fit_raises_value_error(self, fake_tiktoken):
+        from ragframework.document.chunkers import TokenChunker
+
+        doc = Document(id="x", content="🙂", metadata={})
+        chunker = TokenChunker(chunk_tokens=1, overlap_tokens=0)
+        with pytest.raises(ValueError, match="cannot fit within chunk_tokens"):
+            chunker.chunk(doc)
